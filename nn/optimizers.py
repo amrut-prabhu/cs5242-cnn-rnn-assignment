@@ -116,7 +116,7 @@ class Adagrad(Optimizer):
 
 
 class RMSprop(Optimizer):
-    def __init__(self, lr=0.001, bata=0.9, epsilon=None, decay=0, sheduler_func=None):
+    def __init__(self, lr=0.001, beta=0.9, epsilon=None, decay=0, sheduler_func=None):
         """Initialization
 
         # Arguments
@@ -126,7 +126,7 @@ class RMSprop(Optimizer):
             decay: float, the learning rate decay ratio
         """
         super(RMSprop, self).__init__(lr)
-        self.bata = bata
+        self.beta = beta
         self.epsilon = epsilon
         self.decay = decay
         if not self.epsilon:
@@ -155,8 +155,11 @@ class RMSprop(Optimizer):
             for k, v in w.items():
                 self.accumulators[k] = np.zeros(v.shape)
         for k in list(w.keys()):
-            self.accumulators[k] = self.bata * self.accumulators[k] + (1 - self.bata) * w_grads[k]**2
-            new_w[k] = w[k] - self.lr * w_grads[k] / (np.sqrt(self.accumulators[k] + self.epsilon))
+            #####################################################################################
+            # code here
+            self.accumulators[k] = None
+            new_w[k] = None
+            #####################################################################################
         return new_w
 
 

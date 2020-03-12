@@ -895,11 +895,12 @@ class BiRNN(Layer):
             output: numpy array with shape (batch, time_steps, units*2)
         """
         mask = ~np.any(np.isnan(input), axis=2)
-        forward_output = self.forward_rnn.forward(input)
-        backward_output = self.backward_rnn.forward(
-            self._reverse_temporal_data(input, mask))
-        output = np.concatenate(
-            [forward_output, self._reverse_temporal_data(backward_output, mask)], axis=2)
+        
+        #####################################################################################
+        # code here
+        output = None
+        #####################################################################################
+        
         return output
 
     def backward(self, out_grad, input):

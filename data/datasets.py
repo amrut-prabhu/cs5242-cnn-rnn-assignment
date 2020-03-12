@@ -1,5 +1,5 @@
 """
-MNIST handwritten digits dataset.
+Fashion_MNIST dataset.
 
 """
 import numpy as np
@@ -7,8 +7,9 @@ import os
 import wget
 import pandas as pd
 import nltk
+import gzip
 
-class MNIST():
+class Fashion_MNIST():
 
     def __init__(self):
         self.x_train = None
@@ -21,8 +22,8 @@ class MNIST():
         self.num_test = 0
         self.num_val = 0
 
-    def load(self, path='data/mnist.npz'):
-        """Loads the MNIST dataset.
+    def load(self, path='data/fashion'):
+        """Loads the Fashion_MNIST dataset.
 
         # Arguments
             path: path where to cache the dataset locally
@@ -30,27 +31,35 @@ class MNIST():
         # Returns
             none
         """
-        if not os.path.exists(path):
-            print('start download mnist dataset...')
-            wget.download('https://s3.amazonaws.com/img-datasets/mnist.npz', out=path)
-        f = np.load(path)
-        x_train, y_train = f['x_train'], f['y_train']
-        x_test, y_test = f['x_test'], f['y_test']
-        f.close()
-
+        y_train_path = os.path.join(path, 'train-labels-idx1-ubyte.gz')
+        x_train_path = os.path.join(path, 'train-images-idx3-ubyte.gz')
+        y_test_path = os.path.join(path, 't10k-labels-idx1-ubyte.gz')
+        x_test_path = os.path.join(path, 't10k-images-idx3-ubyte.gz')
+        with gzip.open(y_train_path, 'rb') as lbpath:
+            y_train = np.frombuffer(lbpath.read(), dtype=np.uint8,
+                               offset=8) 
+        with gzip.open(y_test_path, 'rb') as lbpath:
+            y_test = np.frombuffer(lbpath.read(), dtype=np.uint8,
+                               offset=8)         
+        with gzip.open(x_train_path, 'rb') as imgpath:
+            x_train = np.frombuffer(imgpath.read(), dtype=np.uint8,
+                               offset=16).reshape(len(y_train), 28, 28)
+        with gzip.open(x_test_path, 'rb') as imgpath:
+            x_test = np.frombuffer(imgpath.read(), dtype=np.uint8,
+                               offset=16).reshape(len(y_test), 28, 28)
         # normalization
         # x_train = (x_train-np.mean(x_train, axis=0, keepdims=True))/255
         # x_test = (x_test-np.mean(x_test, axis=0, keepdims=True))/255
 
-        x_train = x_train/255
-        x_test = x_test/255
+        #x_train = x_train/255
+        #x_test = x_test/255
 
         x_train_shape = x_train.shape
         x_test_shape = x_test.shape
         x_train = x_train.reshape(x_train_shape[0], 1, x_train_shape[1], x_train_shape[2])
         x_test = x_test.reshape(x_test_shape[0], 1, x_test_shape[1], x_test_shape[2])
 
-        self.num_train = int(x_train.shape[0] * 0.8)
+        self.num_train = int(x_train.shape[0] * 0.9)
         self.num_val = x_train.shape[0] - self.num_train
         self.num_test = x_test.shape[0]
 

@@ -183,24 +183,11 @@ class conv(operator):
         out_channel = self.conv_params['out_channel']
 
         batch, in_channel, in_height, in_width = input.shape
-        out_height = 1 + (in_height - kernel_h + pad) // stride
-        out_width = 1 + (in_width - kernel_w + pad) // stride
-        output = np.zeros((batch, out_channel, out_height, out_width))
-
-        pad_scheme = (pad//2, pad - pad//2)
-        input_pad = np.pad(input, pad_width=((0,0), (0,0), pad_scheme, pad_scheme),
-                           mode='constant', constant_values=0)
-
-        # get initial nodes of receptive fields in height and width direction
-        recep_fields_h = [stride*i for i in range(out_height)]
-        recep_fields_w = [stride*i for i in range(out_width)]
-
-        input_conv = img2col(input_pad, recep_fields_h,
-                             recep_fields_w, kernel_h, kernel_w)
-        output = np.stack(map(
-            lambda x: np.matmul(weights.reshape(out_channel, -1), x) + bias.reshape(-1, 1), input_conv), axis=0)
-
-        output = output.reshape(batch, out_channel, out_height, out_width)
+        #####################################################################################
+        # code here
+        output = None
+        
+        #####################################################################################
         return output
 
     def backward(self, out_grad, input, weights, bias):
@@ -222,41 +209,16 @@ class conv(operator):
         stride = self.conv_params['stride']
         in_channel = self.conv_params['in_channel']
         out_channel = self.conv_params['out_channel']
-
+        
+        
+        
         batch, in_channel, in_height, in_width = input.shape
-        out_height = 1 + (in_height - kernel_h + pad) // stride
-        out_width = 1 + (in_width - kernel_w + pad) // stride
-
-        pad_scheme = (pad//2, pad - pad//2)
-        input_pad = np.pad(input, pad_width=((0,0), (0,0), pad_scheme, pad_scheme),
-                           mode='constant', constant_values=0)
-                           
-        # get initial nodes of receptive fields in height and width direction
-        recep_fields_h = [stride*i for i in range(out_height)]
-        recep_fields_w = [stride*i for i in range(out_width)]
-
-        input_conv = img2col(input_pad, recep_fields_h,
-                             recep_fields_w, kernel_h, kernel_w)
-        input_conv_grad = np.stack(map(lambda x: np.matmul(weights.reshape(out_channel, -1).T, x),
-                                       out_grad.reshape(batch, out_channel, -1)), axis=0)
-
-        input_pad_grad = np.zeros(
-            (batch, in_channel, in_height+2*pad, in_width+2*pad))
-        idx = 0
-        for i in recep_fields_h:
-            for j in recep_fields_w:
-                input_pad_grad[:, :, i:i+kernel_h, j:j+kernel_w] += \
-                    input_conv_grad[:, :, idx].reshape(
-                        batch, in_channel, kernel_h, kernel_w)
-                idx += 1
-        in_grad = input_pad_grad[:, :, pad:pad +
-                                 in_height, pad:pad+in_width]
-        w_grad = sum(
-            list(map(lambda x: np.matmul(x[0], x[1].T), zip(out_grad.reshape(batch, out_channel, -1), input_conv))))
-        w_grad = w_grad.reshape(weights.shape)
-
-        b_grad = out_grad.sum(axis=(0, 2, 3))
-
+        #################################################################################
+        # code here
+        in_grad = none
+        w_grad = none 
+        b_grad = none
+        #################################################################################
         return in_grad, w_grad, b_grad
 
 
@@ -289,26 +251,10 @@ class pool(operator):
         pad = self.pool_params['pad']
 
         batch, in_channel, in_height, in_width = input.shape
-        out_height = 1 + (in_height - pool_height + pad) // stride
-        out_width = 1 + (in_width - pool_width + pad) // stride
-
-        pad_scheme = (pad//2, pad - pad//2)
-        input_pad = np.pad(input, pad_width=((0,0), (0,0), pad_scheme, pad_scheme),
-                           mode='constant', constant_values=0)
-
-        recep_fields_h = [stride*i for i in range(out_height)]
-        recep_fields_w = [stride*i for i in range(out_width)]
-
-        input_pool = img2col(input_pad, recep_fields_h,
-                             recep_fields_w, pool_height, pool_width)
-        input_pool = input_pool.reshape(
-            batch, in_channel, -1, out_height, out_width)
-        if pool_type == 'max':
-            output = np.max(input_pool, axis=2)
-        elif pool_type == 'avg':
-            output = np.average(input_pool, axis=2)
-        else:
-            raise ValueError('Doesn\'t support \'%s\' pooling.' % pool_type)
+        #####################################################################################
+        # code here
+        output = None
+        #####################################################################################
         return output
 
     def backward(self, out_grad, input):
@@ -395,7 +341,10 @@ class dropout(operator):
             p = np.random.random_sample(input.shape)
             # Please use p as the probability to decide whether drop or not
             self.mask = (p >= self.rate).astype('int')
-            output = input * self.mask * scale
+            #####################################################################################
+            # code here
+            output = None
+            #####################################################################################
         else:
             output = input
         return output
@@ -411,8 +360,10 @@ class dropout(operator):
             in_grad: gradient to forward input of dropout, same shape as input
         """
         if self.training:
-            scale = 1/(1-self.rate)
-            in_grad = scale * self.mask * out_grad
+            #####################################################################################
+            # code here
+            in_grad = None
+            #####################################################################################
         else:
             in_grad = out_grad
         return in_grad
@@ -491,13 +442,17 @@ class gru(operator):
         recurrent_kernel_z = recurrent_kernel[:, :units]
         recurrent_kernel_r = recurrent_kernel[:, units:2*units]
         recurrent_kernel_h = recurrent_kernel[:, 2*units:all_units]
+
+        #####################################################################################
+        # code here
         # reset gate
-        x_r = sigmoid(x.dot(kernel_r) + prev_h.dot(recurrent_kernel_r))
+        x_r = None
         # update gate
-        x_z = sigmoid(x.dot(kernel_z) + prev_h.dot(recurrent_kernel_z))
+        x_z = None
         # new gate
-        x_h = np.tanh(x.dot(kernel_h) + np.dot(x_r * prev_h, recurrent_kernel_h))
-        
+        x_h = None
+        #####################################################################################
+
         output = (1 - x_z) * x_h + x_z * prev_h
         
         return output
@@ -520,33 +475,20 @@ class gru(operator):
         recurrent_kernel_z = recurrent_kernel[:, :units]
         recurrent_kernel_r = recurrent_kernel[:, units:2*units]
         recurrent_kernel_h = recurrent_kernel[:, 2*units:all_units]
-        # reset gate
-        x_r = sigmoid(x.dot(kernel_r) + prev_h.dot(recurrent_kernel_r))
-        # update gate
-        x_z = sigmoid(x.dot(kernel_z) + prev_h.dot(recurrent_kernel_z))
-        # new gate
-        x_h = np.tanh(x.dot(kernel_h) + np.dot(x_r * prev_h, recurrent_kernel_h))
-        output = (1 - x_z) * x_h + x_z * prev_h
 
-        sig_grad_xr = x_r * (1 - x_r)
-        sig_grad_xz = x_z * (1 - x_z)
-        tanh_grad_xh = (1 - np.square(x_h))
+        #####################################################################################
+        # code here
+        x_grad = None
+        prev_h_grad = None
 
-        x_grad = (out_grad * (prev_h - x_h) * sig_grad_xz).dot(kernel_z.T) + \
-            (out_grad * (1 - x_z) * tanh_grad_xh).dot(kernel_h.T) + \
-            ((out_grad * (1 - x_z) * tanh_grad_xh).dot(recurrent_kernel_h.T) * prev_h * sig_grad_xr).dot(kernel_r.T)
+        kernel_r_grad = None
+        kernel_z_grad = None
+        kernel_h_grad = None
 
-        prev_h_grad = out_grad * x_z + (out_grad * (prev_h - x_h) * sig_grad_xz).dot(recurrent_kernel_z.T) + \
-            (out_grad * (1 - x_z) * tanh_grad_xh).dot(recurrent_kernel_h.T) * x_r + \
-            ((out_grad * (1 - x_z) * tanh_grad_xh).dot(recurrent_kernel_h.T) * prev_h * sig_grad_xr).dot(recurrent_kernel_r.T)
-
-        kernel_r_grad = x.T.dot((out_grad * (1 - x_z) * tanh_grad_xh).dot(recurrent_kernel_h.T) * prev_h * sig_grad_xr)
-        kernel_z_grad = x.T.dot(out_grad * (prev_h - x_h) * sig_grad_xz)
-        kernel_h_grad = x.T.dot(out_grad * (1 - x_z) * tanh_grad_xh)
-
-        recurrent_kernel_r_grad = prev_h.T.dot((out_grad * (1 - x_z) * tanh_grad_xh).dot(recurrent_kernel_h.T) * prev_h * sig_grad_xr)
-        recurrent_kernel_z_grad = prev_h.T.dot(out_grad * (prev_h - x_h) * sig_grad_xz)
-        recurrent_kernel_h_grad = (x_r * prev_h).T.dot(out_grad * (1 - x_z) * tanh_grad_xh)
+        recurrent_kernel_r_grad = None
+        recurrent_kernel_z_grad = None
+        recurrent_kernel_h_grad = None
+        #####################################################################################
 
         in_grad = [x_grad, prev_h_grad]
         kernel_grad = np.concatenate([kernel_z_grad, kernel_r_grad, kernel_h_grad], axis=-1)
