@@ -14,15 +14,16 @@ jupyter notebook
 
 ## Marking scheme
 
-3 marks for `RMSprop` update function
-3 marks for `conv` forward function
-3 marks for `pool` forward function
-3 marks for `dropout` forward and backward function
-3 marks for `gru` forward and backward function
-3 marks for `BiRNN` forward function
-3 marks for tuning your best Fashion_MNISTNet (in `main.ipynb`)
-3 marks for tuning your best SentimentNet (in `main.ipynb`)
-1 marks for your submission format
+- 3 marks each for:
+    1. `RMSprop` update function
+    2. `conv` forward function
+    3. `pool` forward function
+    4. `dropout` forward and backward function
+    5. `gru` forward and backward function
+    6. `BiRNN` forward function
+    7. tuning your best Fashion_MNISTNet (in `main.ipynb`)
+    8. tuning your best SentimentNet (in `main.ipynb`)
+- 1 marks for your submission format
 
 ## Requirements
 
