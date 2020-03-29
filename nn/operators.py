@@ -150,6 +150,20 @@ class linear(operator):
         return in_grad, w_grad, b_grad
 
 
+def get_output_size(n, k, p, s):
+    """
+    # Arguments
+        n: input size
+        p: padding
+        k: kernel size
+        s: stride
+
+    # Returns 
+        o: output size
+    """
+    return int(np.floor((n + p - k) / s) + 1)
+
+
 class conv(operator):
     def __init__(self, conv_params):
         """
@@ -165,18 +179,6 @@ class conv(operator):
         super(conv, self).__init__()
         self.conv_params = conv_params
 
-    def get_output_size(self, n, k, p, s):
-        """
-        # Arguments
-            n: input size
-            p: padding
-            k: kernel size
-            s: stride
-
-        # Returns 
-            o: output size
-        """
-        return int(np.floor((n + p - k) / s) + 1)
 
     def get_im2col_data_indexes(self, N, c_i, n_h, n_w, k_h, k_w, p, s, o_h, o_w):
         """
@@ -236,8 +238,8 @@ class conv(operator):
             o_h: height of output
             o_w: width of output
         """
-        o_h = self.get_output_size(n_h, k_h, p, s)
-        o_w = self.get_output_size(n_w, k_w, p, s)
+        o_h = get_output_size(n_h, k_h, p, s)
+        o_w = get_output_size(n_w, k_w, p, s)
 
         channel_idxs, height_idxs, width_ixds = self.get_im2col_data_indexes(N, c_i, n_h, n_w, k_h, k_w, p, s, o_h, o_w)
 
@@ -304,11 +306,11 @@ class conv(operator):
         # Returns
             dX: gradient to the forward input of conv layer, with shape (N, c_i, n_h, n_w)
         """
-        o_h = self.get_output_size(n_h, k_h, p, s)
-        o_w = self.get_output_size(n_w, k_w, p, s)
+        o_h = get_output_size(n_h, k_h, p, s)
+        o_w = get_output_size(n_w, k_w, p, s)
 
         # Empty array to fill with gradient values
-        dX_pad = np.zeros((N, c_i, n_h + p, n_w + p)) # TODO: , dtype=dX_hat.dtype)
+        dX_pad = np.zeros((N, c_i, n_h + p, n_w + p))
         
         channel_idxs, height_idxs, width_ixds = self.get_im2col_data_indexes(N, c_i, n_h, n_w, k_h, k_w, p, s, o_h, o_w)
 
@@ -405,7 +407,29 @@ class pool(operator):
         batch, in_channel, in_height, in_width = input.shape
         #####################################################################################
         # code here
-        output = None
+        out_height = get_output_size(in_height, pool_height, pad, stride)
+        out_width = get_output_size(in_width, pool_width, pad, stride)
+
+        p = int(pad / 2) # pad is guaranteed to be even
+        X_pad = np.pad(input, ((0, 0), (0, 0), (p, p), (p, p)), mode='constant', constant_values=0)
+
+        output = np.zeros((out_height, out_width, batch, in_channel))
+        for i in range(out_height):
+            for j in range(out_width):
+                height_offset = i * stride
+                width_offset = j * stride
+
+                # Pool for receptive fields over all channels for full batch. Result shape is (batch, in_channel)
+                receptive_fields = X_pad[:, :, height_offset:height_offset + pool_height, width_offset:width_offset + pool_width]
+                if pool_type == 'max':
+                    output[i,j] = np.amax(receptive_fields, axis=(2,3)) 
+                elif pool_type == 'avg':
+                    output[i,j] = np.mean(receptive_fields, axis=(2,3)) 
+                else:
+                    raise TypeError("Error: pool_type should be 'max' or 'avg'")
+
+        # Change (out_height, out_width, batch, in_channel) to (batch, in_channel, out_height, out_width)
+        output = output.transpose(2,3,0,1)
         #####################################################################################
         return output
 
