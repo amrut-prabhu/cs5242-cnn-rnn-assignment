@@ -165,6 +165,50 @@ class conv(operator):
         super(conv, self).__init__()
         self.conv_params = conv_params
 
+    def get_output_size(n, k, p, s):
+    """
+    # Arguments
+        n: input size
+        p: padding
+        k: kernel size
+        s: stride
+
+    # Returns 
+        o: output size
+    """
+        return int(np.floor((n + p - k) / s) + 1)
+
+
+    def img2col(X, c_i, n_h, n_w, k_h, k_w, p, s):
+        o_h = self.get_output_size(n_h, k_h, p, s)
+        o_w = self.get_output_size(n_w, k_w, p, s)
+
+        # Indices of the channel for each row in the output reshaped batch data
+        channel_idxs = np.repeat(np.arange(c_i), k_h * k_w).reshape(-1, 1)
+
+        # Indices of heights of a single receptive field for all channels
+        k_height_idxs = np.repeat(np.arange(k_h), k_w)
+        k_height_idxs = np.tile(k_height_idxs, c_i)
+        # Offsets for heights of receptive fields
+        height_offsets = np.repeat(np.arange(o_h), o_w) * s
+
+        height_idxs = k_height_idxs.reshape(-1, 1) + height_offsets.reshape(1, -1)
+
+
+        # Indices of widths of a single receptive field for all channels
+        k_width_idxs = np.tile(np.arange(k_w), k_h * c_i)
+        width_offsets = np.tile(np.arange(o_w), o_h) * s
+
+        width_ixds = k_width_idxs.reshape(-1, 1) + width_offsets.reshape(1, -1)
+
+
+        X_cols = X[:, channel_idxs, height_idxs, width_ixds]
+        # Combine the batch instances into a single matrix
+        X_cols = X_cols.transpose(1, 2, 0).reshape(k_h * k_w * c_i, -1)
+
+        return X_cols, o_h, o_w
+
+
     def forward(self, input, weights, bias):
         """
         # Arguments
@@ -180,13 +224,27 @@ class conv(operator):
         pad = self.conv_params['pad']
         stride = self.conv_params['stride']
         in_channel = self.conv_params['in_channel']
-        out_channel = self.conv_params['out_channel']
+        out_channel = self.conv_params['out_channel'] # equivalent to number of kernels
 
         batch, in_channel, in_height, in_width = input.shape
         #####################################################################################
         # code here
-        output = None
-        
+
+        # Add zero padding to height and width dimensions of input
+        p = int(pad / 2) # pad is guaranteed to be even
+        X_pad = np.pad(input, ((0, 0), (0, 0), (p, p), (p, p)), mode='constant', constant_values=0)
+
+        # Reshape input feature maps and filters    
+        X_hat, out_height, out_width = self.img2col(X_pad, in_channel, in_height, in_width, kernel_h, kernel_w, pad, stride)
+        W = weights.reshape((out_channel, in_channel * kernel_h * kernel_w))
+        b = np.repeat(bias, batch * out_height * out_width).reshape(out_channel, -1)
+
+        # Compute output
+        Y = W.dot(X_hat) + b
+
+        # Reshape output to correct shape
+        output = Y.reshape(out_channel, out_height, out_width, batch)
+        output = output.transpose(3, 0, 1, 2)
         #####################################################################################
         return output
 
