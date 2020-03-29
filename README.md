@@ -18,7 +18,7 @@ jupyter notebook
     1. [x] `RMSprop` update function
     2. [x] `conv` forward function
     3. [x] `pool` forward function
-    4. [ ] `dropout` forward and backward function
+    4. [x] `dropout` forward and backward function
     5. [ ] `gru` forward and backward function
     6. [ ] `BiRNN` forward function
     7. [ ] tuning your best Fashion_MNISTNet (in `main.ipynb`)

@@ -519,7 +519,8 @@ class dropout(operator):
             self.mask = (p >= self.rate).astype('int')
             #####################################################################################
             # code here
-            output = None
+            self.mask = self.mask * scale
+            output = input * self.mask
             #####################################################################################
         else:
             output = input
@@ -538,7 +539,7 @@ class dropout(operator):
         if self.training:
             #####################################################################################
             # code here
-            in_grad = None
+            in_grad = out_grad * self.mask
             #####################################################################################
         else:
             in_grad = out_grad
