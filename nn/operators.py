@@ -270,7 +270,6 @@ class conv(operator):
         batch, in_channel, in_height, in_width = input.shape
         #####################################################################################
         # code here
-
         # Add zero padding to height and width dimensions of input
         p = int(pad / 2) # pad is guaranteed to be even
         X_pad = np.pad(input, ((0, 0), (0, 0), (p, p), (p, p)), mode='constant', constant_values=0)
@@ -609,6 +608,11 @@ class gru(operator):
             inputs: [input numpy array with shape (batch, in_features), 
                     state numpy array with shape (batch, units)]
 
+            kernel: input weights with shape (in_features, 3 * units)
+                    each has shape (in_features, units)
+            recurrent_kernel: gate and cell state weights with shape (units, 3 * units)
+                              each has shape (units, units)
+
         # Returns
             outputs: numpy array with shape (batch, units)
         """
@@ -622,12 +626,13 @@ class gru(operator):
 
         #####################################################################################
         # code here
-        # reset gate
-        x_r = None
+        # Each of these gates are of shape (batch, units)
         # update gate
-        x_z = None
+        x_z = sigmoid(X.dot(kernel_z) + prev_h.dot(recurrent_kernel_z))
+        # reset gate
+        x_r = sigmoid(X.dot(kernel_r) + prev_h.dot(recurrent_kernel_r))
         # new gate
-        x_h = None
+        x_h = np.tanh(X.dot(kernel_h) + (x_r * prev_h).dot(recurrent_kernel_h))
         #####################################################################################
 
         output = (1 - x_z) * x_h + x_z * prev_h
@@ -637,12 +642,12 @@ class gru(operator):
     def backward(self, out_grad, input, kernel, recurrent_kernel):
         """
         # Arguments
-            in_grads: numpy array with shape (batch, units), gradients to outputs
+            out_grad: numpy array with shape (batch, units), gradients to outputs
             inputs: [input numpy array with shape (batch, in_features), 
                     state numpy array with shape (batch, units)], same with forward inputs
 
         # Returns
-            out_grads: [gradients to input numpy array with shape (batch, in_features), 
+            in_grad: [gradients to input numpy array with shape (batch, in_features), 
                         gradients to state numpy array with shape (batch, units)]
         """
         x, prev_h = input
