@@ -898,7 +898,13 @@ class BiRNN(Layer):
         
         #####################################################################################
         # code here
-        output = None
+        output_forward = self.forward_rnn.forward(input)
+
+        input_roll = self._reverse_temporal_data(input, mask)
+        output_backward = self.backward_rnn.forward(input_roll)
+        output_backward_roll = self._reverse_temporal_data(output_backward, mask)
+
+        output = np.concatenate([output_forward, output_backward_roll], axis=-1)
         #####################################################################################
         
         return output
