@@ -166,20 +166,35 @@ class conv(operator):
         self.conv_params = conv_params
 
     def get_output_size(n, k, p, s):
-    """
-    # Arguments
-        n: input size
-        p: padding
-        k: kernel size
-        s: stride
+        """
+        # Arguments
+            n: input size
+            p: padding
+            k: kernel size
+            s: stride
 
-    # Returns 
-        o: output size
-    """
+        # Returns 
+            o: output size
+        """
         return int(np.floor((n + p - k) / s) + 1)
 
+    def get_im2col_data_indexes(N, c_i, n_h, n_w, k_h, k_w, p, s):
+        """
+        # Arguments
+            N: batch size (number of instances)
+            c_i: number of input channels
+            n_h: input height
+            n_w: input width
+            k_h: kernel height
+            k_w: kernel width
+            p: total padding
+            s: stride length
 
-    def img2col(X, c_i, n_h, n_w, k_h, k_w, p, s):
+        # Returns
+            channel_idxs: indices of the channel in the img2col array row
+            height_idxs: indices of the input height in the img2col array cell
+            width_ixds: indices of the input width in the img2col array cell
+        """
         o_h = self.get_output_size(n_h, k_h, p, s)
         o_w = self.get_output_size(n_w, k_w, p, s)
 
@@ -200,13 +215,35 @@ class conv(operator):
         width_offsets = np.tile(np.arange(o_w), o_h) * s
 
         width_ixds = k_width_idxs.reshape(-1, 1) + width_offsets.reshape(1, -1)
+        
+        return channel_idxs, height_idxs, width_ixds
 
 
-        X_cols = X[:, channel_idxs, height_idxs, width_ixds]
+    def img2col(X, N, c_i, n_h, n_w, k_h, k_w, p, s):
+        """
+        # Arguments
+            X: padded input array
+            N: batch size (number of instances)
+            c_i: number of input channels
+            n_h: input height
+            n_w: input width
+            k_h: kernel height
+            k_w: kernel width
+            p: total padding
+            s: stride length
+
+        # Returns
+            X_hat: img2col representation of input of conv layer
+            o_h: height of output
+            o_w: width of output
+        """
+        channel_idxs, height_idxs, width_ixds = self.get_im2col_data_indexes(N, c_i, n_h, n_w, k_h, k_w, p, s)
+
+        X_hat_batch = X[:, channel_idxs, height_idxs, width_ixds]
         # Combine the batch instances into a single matrix
-        X_cols = X_cols.transpose(1, 2, 0).reshape(k_h * k_w * c_i, -1)
+        X_hat = X_hat_batch.transpose(1, 2, 0).reshape(k_h * k_w * c_i, -1)
 
-        return X_cols, o_h, o_w
+        return X_hat, o_h, o_w
 
 
     def forward(self, input, weights, bias):
@@ -235,7 +272,7 @@ class conv(operator):
         X_pad = np.pad(input, ((0, 0), (0, 0), (p, p), (p, p)), mode='constant', constant_values=0)
 
         # Reshape input feature maps and filters    
-        X_hat, out_height, out_width = self.img2col(X_pad, in_channel, in_height, in_width, kernel_h, kernel_w, pad, stride)
+        X_hat, out_height, out_width = self.img2col(X_pad, batch, in_channel, in_height, in_width, kernel_h, kernel_w, pad, stride)
         W = weights.reshape((out_channel, in_channel * kernel_h * kernel_w))
         b = np.repeat(bias, batch * out_height * out_width).reshape(out_channel, -1)
 
@@ -248,6 +285,44 @@ class conv(operator):
         #####################################################################################
         return output
 
+
+    def col2img(dX_hat, N, c_i, n_h, n_w, k_h, k_w, p, s):
+        """
+        # Arguments
+            dX_hat: img2col representation of gradient to the forward input of conv layer
+            N: batch size (number of instances)
+            c_i: number of input channels
+            n_h: input height
+            n_w: input width
+            k_h: kernel height
+            k_w: kernel width
+            p: total padding
+            s: stride length
+
+        # Returns
+            dX: gradient to the forward input of conv layer, with shape (N, c_i, n_h, n_w)
+        """
+        # Empty array to fill with gradient values
+        dX_pad = np.zeros((N, c_i, n_h + p, n_w + p)) # TODO: , dtype=dX_hat.dtype)
+        
+        channel_idxs, height_idxs, width_ixds = self.get_im2col_data_indexes(N, c_i, n_h, n_w, k_h, k_w, p, s)
+
+        # Get img2col for each batch instance
+        dX_hat_batch = dX_hat.reshape(c_i * k_h * k_w, -1, N)
+        dX_hat_batch = dX_hat_batch.transpose(2, 0, 1)
+
+        # Fill in output with values from img2col batches
+        np.add.at(dX_pad, (slice(None), channel_idxs, height_idxs, width_ixds), dX_hat_batch)
+
+        # Remove padding rows and columns
+        if p != 0:
+            dX = dX_pad[:, :, p:-p, p:-p]
+        else:
+            dX = dX_pad
+        
+        return dX
+
+    
     def backward(self, out_grad, input, weights, bias):
         """
         # Arguments
@@ -273,9 +348,23 @@ class conv(operator):
         batch, in_channel, in_height, in_width = input.shape
         #################################################################################
         # code here
-        in_grad = none
-        w_grad = none 
-        b_grad = none
+        # Reshape input, weights, and gradient to col
+        p = int(pad / 2) # pad is guaranteed to be even
+        X_pad = np.pad(input, ((0, 0), (0, 0), (p, p), (p, p)), mode='constant', constant_values=0)
+        X_hat, out_height, out_width = self.img2col(X_pad, batch, in_channel, in_height, in_width, kernel_h, kernel_w, pad, stride)
+
+        W = weights.reshape((out_channel, in_channel * kernel_h * kernel_w))
+        
+        out_grad_col = out_grad.transpose(1, 2, 3, 0).reshape((out_channel, batch * out_height * out_width))
+
+        # Compute gradients
+        dX_hat = W.transpose().dot(out_grad_col)
+        in_grad = self.col2img(dX_hat, batch, in_channel, in_height, in_width, kernel_h, kernel_w, pad, stride)
+        
+        w_grad = out_grad_col.dot(X_hat.transpose())
+        w_grad = w_grad.reshape((out_channel, in_channel, kernel_h, kernel_w))
+
+        b_grad = np.sum(out_grad, axis=(0, 2, 3)) # sum up for all batches, heights and widths in a channel
         #################################################################################
         return in_grad, w_grad, b_grad
 
