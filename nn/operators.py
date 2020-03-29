@@ -628,11 +628,11 @@ class gru(operator):
         # code here
         # Each of these gates are of shape (batch, units)
         # update gate
-        x_z = sigmoid(X.dot(kernel_z) + prev_h.dot(recurrent_kernel_z))
+        x_z = sigmoid(x.dot(kernel_z) + prev_h.dot(recurrent_kernel_z))
         # reset gate
-        x_r = sigmoid(X.dot(kernel_r) + prev_h.dot(recurrent_kernel_r))
+        x_r = sigmoid(x.dot(kernel_r) + prev_h.dot(recurrent_kernel_r))
         # new gate
-        x_h = np.tanh(X.dot(kernel_h) + (x_r * prev_h).dot(recurrent_kernel_h))
+        x_h = np.tanh(x.dot(kernel_h) + (x_r * prev_h).dot(recurrent_kernel_h))
         #####################################################################################
 
         output = (1 - x_z) * x_h + x_z * prev_h
@@ -660,16 +660,51 @@ class gru(operator):
 
         #####################################################################################
         # code here
-        x_grad = None
-        prev_h_grad = None
+        # gates
+        x_z = sigmoid(x.dot(kernel_z) + prev_h.dot(recurrent_kernel_z))
+        x_r = sigmoid(x.dot(kernel_r) + prev_h.dot(recurrent_kernel_r))
+        x_h = np.tanh(x.dot(kernel_h) + (x_r * prev_h).dot(recurrent_kernel_h))
 
-        kernel_r_grad = None
-        kernel_z_grad = None
-        kernel_h_grad = None
+        # Given:
+        # output = (1 - x_z) * x_h + x_z * prev_h
+        # x_z = sigmoid(x_z_raw)
+        # x_h = tanh(x_h_raw)
+        # x_h_raw = x . kernel_h + (x_r * prev_h) . recurrent_kernel_h
+        # x_r = sigmoid(x_r_raw)
+        # x_r_raw = x . kernel_r  +  prev_h . recurrent_kernel_r
 
-        recurrent_kernel_r_grad = None
-        recurrent_kernel_z_grad = None
-        recurrent_kernel_h_grad = None
+        # ∂L/∂z = ∂L/∂output * ∂output/∂z = out_grad * (-x_h + prev_h)  
+        x_z_grad = out_grad * (prev_h - x_h)
+        # ∂L/∂z_raw = ∂L/∂z * ∂z/∂z_raw = x_z_grad * x_z * (1 - x_z)
+        x_z_raw_grad = x_z_grad * x_z * (1 - x_z)
+        
+        # ∂L/∂h = ∂L/∂output * ∂output/∂h = out_grad * (1 - x_z)
+        x_h_grad = out_grad * (1 - x_z)
+        # ∂L/∂h_raw = ∂L/∂h * ∂h/∂h_raw = x_h_grad * (1 - x_h^2)
+        x_h_raw_grad = x_h_grad * (1 - x_h ** 2)
+        
+        # ∂L/∂r = ∂L/∂h_raw * ∂h_raw/∂r = x_h_raw_grad * transpose(recurrent_kernel_h) * prev_h
+        x_r_grad = x_h_raw_grad.dot(recurrent_kernel_h.transpose()) * prev_h
+        # ∂L/∂r_raw = ∂L/∂r * ∂r/∂r_raw = x_r_grad * x_r * (1 - x_r)
+        x_r_raw_grad = x_r_grad * x_r * (1 - x_r)
+
+
+        x_grad = x_z_raw_grad.dot(kernel_z.transpose()) \
+                    + x_r_raw_grad.dot(kernel_r.transpose()) \
+                    + x_h_raw_grad.dot(kernel_h.transpose())
+
+        prev_h_grad = x_z_raw_grad.dot(recurrent_kernel_z.transpose()) \
+                        + x_r_raw_grad.dot(recurrent_kernel_r.transpose()) \
+                        + x_h_raw_grad.dot(recurrent_kernel_h.transpose()) * x_r \
+                        + out_grad * x_z
+
+        kernel_r_grad = x.transpose().dot(x_r_raw_grad)
+        kernel_z_grad = x.transpose().dot(x_z_raw_grad)
+        kernel_h_grad = x.transpose().dot(x_h_raw_grad)
+
+        recurrent_kernel_r_grad = prev_h.transpose().dot(x_r_raw_grad)
+        recurrent_kernel_z_grad = prev_h.transpose().dot(x_z_raw_grad)
+        recurrent_kernel_h_grad = (prev_h * x_r).transpose().dot(x_h_raw_grad)
         #####################################################################################
 
         in_grad = [x_grad, prev_h_grad]
