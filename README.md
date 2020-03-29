@@ -19,7 +19,7 @@ jupyter notebook
     2. [x] `conv` forward function
     3. [x] `pool` forward function
     4. [x] `dropout` forward and backward function
-    5. [ ] `gru` forward and backward function
+    5. [x] `gru` forward and backward function
     6. [x] `BiRNN` forward function
     7. [ ] tuning your best Fashion_MNISTNet (in `main.ipynb`)
     8. [ ] tuning your best SentimentNet (in `main.ipynb`)
