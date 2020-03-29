@@ -165,7 +165,7 @@ class conv(operator):
         super(conv, self).__init__()
         self.conv_params = conv_params
 
-    def get_output_size(n, k, p, s):
+    def get_output_size(self, n, k, p, s):
         """
         # Arguments
             n: input size
@@ -178,7 +178,7 @@ class conv(operator):
         """
         return int(np.floor((n + p - k) / s) + 1)
 
-    def get_im2col_data_indexes(N, c_i, n_h, n_w, k_h, k_w, p, s):
+    def get_im2col_data_indexes(self, N, c_i, n_h, n_w, k_h, k_w, p, s, o_h, o_w):
         """
         # Arguments
             N: batch size (number of instances)
@@ -189,15 +189,14 @@ class conv(operator):
             k_w: kernel width
             p: total padding
             s: stride length
+            o_h: height of output
+            o_w: width of output
 
         # Returns
             channel_idxs: indices of the channel in the img2col array row
             height_idxs: indices of the input height in the img2col array cell
             width_ixds: indices of the input width in the img2col array cell
         """
-        o_h = self.get_output_size(n_h, k_h, p, s)
-        o_w = self.get_output_size(n_w, k_w, p, s)
-
         # Indices of the channel for each row in the output reshaped batch data
         channel_idxs = np.repeat(np.arange(c_i), k_h * k_w).reshape(-1, 1)
 
@@ -219,7 +218,7 @@ class conv(operator):
         return channel_idxs, height_idxs, width_ixds
 
 
-    def img2col(X, N, c_i, n_h, n_w, k_h, k_w, p, s):
+    def img2col(self, X, N, c_i, n_h, n_w, k_h, k_w, p, s):
         """
         # Arguments
             X: padded input array
@@ -237,7 +236,10 @@ class conv(operator):
             o_h: height of output
             o_w: width of output
         """
-        channel_idxs, height_idxs, width_ixds = self.get_im2col_data_indexes(N, c_i, n_h, n_w, k_h, k_w, p, s)
+        o_h = self.get_output_size(n_h, k_h, p, s)
+        o_w = self.get_output_size(n_w, k_w, p, s)
+
+        channel_idxs, height_idxs, width_ixds = self.get_im2col_data_indexes(N, c_i, n_h, n_w, k_h, k_w, p, s, o_h, o_w)
 
         X_hat_batch = X[:, channel_idxs, height_idxs, width_ixds]
         # Combine the batch instances into a single matrix
@@ -286,7 +288,7 @@ class conv(operator):
         return output
 
 
-    def col2img(dX_hat, N, c_i, n_h, n_w, k_h, k_w, p, s):
+    def col2img(self, dX_hat, N, c_i, n_h, n_w, k_h, k_w, p, s):
         """
         # Arguments
             dX_hat: img2col representation of gradient to the forward input of conv layer
@@ -302,10 +304,13 @@ class conv(operator):
         # Returns
             dX: gradient to the forward input of conv layer, with shape (N, c_i, n_h, n_w)
         """
+        o_h = self.get_output_size(n_h, k_h, p, s)
+        o_w = self.get_output_size(n_w, k_w, p, s)
+
         # Empty array to fill with gradient values
         dX_pad = np.zeros((N, c_i, n_h + p, n_w + p)) # TODO: , dtype=dX_hat.dtype)
         
-        channel_idxs, height_idxs, width_ixds = self.get_im2col_data_indexes(N, c_i, n_h, n_w, k_h, k_w, p, s)
+        channel_idxs, height_idxs, width_ixds = self.get_im2col_data_indexes(N, c_i, n_h, n_w, k_h, k_w, p, s, o_h, o_w)
 
         # Get img2col for each batch instance
         dX_hat_batch = dX_hat.reshape(c_i * k_h * k_w, -1, N)
